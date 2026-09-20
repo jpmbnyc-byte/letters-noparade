@@ -477,7 +477,7 @@ function pdpPage(k) {
 <section class="blk statement" style="--accent:var(--v-${set ? "god" : k})"><div class="wrap"><p>${p.statement}</p></div></section>
 <section class="blk"><div class="wrap">${tiles()}</div></section>
 <section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">From the book</p><h2>${set ? "Three ways into the same command." : "Here is how it reads."}</h2></div>${sampleBlock}</div></section>
-<section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">Twelve moons</p><h2>What each moon brings.</h2><p class="lede">All 48 commands, in the order the moons bring them. A 3-moon book holds the first 12 and a 6-moon book the first 24.</p></div>
+<section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">The full list</p><h2>Every command, in order.</h2><p class="lede">${set ? "One command a week, 48 in all, listed below in order. Every volume in this set carries the complete 48." : "One command a week, 48 in all, listed below in order. A 3-moon book carries the first 12 weeks, a 6-moon book the first 24, and the 12-moon book the complete set."}</p></div>
   <div class="acc">${accItem("See all 48 commands", commandsList())}</div></div></section>
 <section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">Others also bought</p><h2>The rest of the shelf.</h2></div><div class="grid g3">${others.map(card).join("")}</div></div></section>`;
 }
