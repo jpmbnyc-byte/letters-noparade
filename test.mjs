@@ -1,0 +1,63 @@
+import assert from "node:assert/strict";
+import { Readable } from "node:stream";
+import { webcrypto } from "node:crypto";
+globalThis.crypto ??= webcrypto;
+
+// in-memory Upstash REST (GET SET DEL SCAN with paging), plus a Stripe stub
+const db = new Map(), ttl = new Map(); let stripeBody, calls = 0;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (u, init) => {
+  u = String(u);
+  if (u === "https://redis.test") {
+    assert.equal(init.headers.Authorization, "Bearer rtok"); const [c, ...a] = JSON.parse(init.body); calls++;
+    if (c === "GET") return Response.json({ result: db.get(a[0]) ?? null });
+    if (c === "SET") { db.set(a[0], a[1]); if (a[2] === "EX") ttl.set(a[0], Number(a[3])); return Response.json({ result: "OK" }); }
+    if (c === "DEL") { db.delete(a[0]); return Response.json({ result: 1 }); }
+    if (c === "SCAN") { const all = [...db.keys()].filter(k => k.startsWith(a[2].replace(/\\(.)/g, "$1").slice(0, -1))).sort(); const i = Number(a[0]), page = all.slice(i, i + 2);
+      return Response.json({ result: [i + 2 >= all.length ? "0" : String(i + 2), page] }); }   // pages of 2 to exercise the cursor loop
+  }
+  if (u.startsWith("https://api.stripe.com/")) { stripeBody = new URLSearchParams(init.body); return Response.json({ url: "https://checkout.stripe.test/c/1" }); }
+  return new Response("ok");
+};
+process.env.KV_REST_API_URL = "https://redis.test"; process.env.KV_REST_API_TOKEN = "rtok";
+process.env.STRIPE_SECRET_KEY = "sk_test"; process.env.STRIPE_WEBHOOK_SECRET = "whsec_t"; process.env.ADMIN_TOKEN = "adm";
+const { default: handler } = await import("./api/[...path].js");
+
+const call = async (method, path, body, headers = {}) => {
+  const raw = body == null ? "" : typeof body === "string" ? body : JSON.stringify(body);
+  const req = Readable.from(raw ? [Buffer.from(raw)] : []); Object.assign(req, { method, url: path, headers: { host: "letters.test", "x-forwarded-proto": "https", ...headers } });
+  const out = { headers: {} }; const res = { setHeader: (k, v) => (out.headers[k.toLowerCase()] = v), end: b => { out.body = b ? b.toString() : ""; out.done(); } };
+  await new Promise(done => { out.done = done; Object.defineProperty(res, "statusCode", { set: v => (out.status = v), get: () => out.status }); handler(req, res); });
+  return out;
+};
+const day = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+const book = (o = {}) => ({ kind: "book", volume: "god", months: 12, mode: "deep", name: "Marielle", start_date: day, tz: "America/New_York", qty: 1, ...o });
+
+let r = await call("POST", "/api/checkout", { email: "a@b.co", lines: [book(), book({ volume: "body", qty: 2 })] }, { "content-type": "application/json" });
+assert.equal(r.status, 200, r.body); const co = JSON.parse(r.body); assert.equal(co.url, "https://checkout.stripe.test/c/1"); assert.equal(co.totals.subtotal, 14400);
+const id = stripeBody.get("metadata[order_id]"); assert.ok(db.has("pending:" + id)); assert.equal(ttl.get("pending:" + id), 259200);
+assert.equal(stripeBody.get("success_url"), `https://letters.test/thank-you/?order=${id}`);          // SITE_URL falls back to the request host
+assert.equal((await call("POST", "/api/checkout", { email: "a@b.co", lines: [] })).status, 400);
+
+const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("whsec_t"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+const sign = async (b, t) => [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${b}`)))].map(x => x.toString(16).padStart(2, "0")).join("");
+const ev = (oid, sid) => JSON.stringify({ type: "checkout.session.completed", data: { object: { id: sid, payment_status: "paid", amount_total: 15300, metadata: { order_id: oid },
+  customer_details: { email: "a@b.co" }, shipping_details: { name: "A B", address: { line1: "1 Broadway", city: "Bayonne", state: "NJ", postal_code: "07002", country: "US" } } } } });
+const wh = async e => { const t = Math.floor(Date.now() / 1000); return call("POST", "/api/stripe-webhook", e, { "stripe-signature": `t=${t},v1=${await sign(e, t)}` }); };
+assert.equal((await wh(ev(id, "cs_1"))).status, 200); assert.equal((await wh(ev(id, "cs_1"))).status, 200);   // twice
+assert.ok(db.has("order:" + id) && !db.has("pending:" + id));
+assert.equal((await call("POST", "/api/stripe-webhook", ev(id, "cs_2"), { "stripe-signature": "t=1,v1=00" })).status, 400);
+await wh(ev("LTG-GONE", "cs_3"));
+
+assert.equal((await call("GET", "/api/admin/orders")).status, 401);
+const list = JSON.parse((await call("GET", "/api/admin/orders", null, { authorization: "Bearer adm" })).body);
+assert.equal(list.length, 2); assert.equal(list.find(o => o.id === "LTG-GONE").status, "needs_attention");
+assert.equal((await call("POST", `/api/admin/orders/${id}/done`, "", { authorization: "Bearer adm" })).status, 200);
+assert.equal(JSON.parse((await call("GET", "/api/admin/orders", null, { authorization: "Bearer adm" })).body).length, 1);
+
+assert.equal((await call("POST", "/api/subscribe", { email: "Reader@Example.com" })).status, 200); assert.ok(db.has("sub:reader@example.com"));
+assert.equal((await call("POST", "/api/contact", { name: "A", email: "a@b.co", topic: "order", message: "Where is my book?" })).status, 200);
+assert.equal(JSON.parse((await call("GET", "/api/admin/messages", null, { authorization: "Bearer adm" })).body).length, 1);
+assert.equal((await call("OPTIONS", "/api/checkout")).status, 200);
+assert.equal((await call("GET", "/api/nothing")).status, 404);
+console.log("vercel adapter tests passed;", calls, "redis calls");

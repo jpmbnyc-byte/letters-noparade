@@ -1,0 +1,6 @@
+{
+  "name": "letters-to-god-store",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" }
+}
