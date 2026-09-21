@@ -142,6 +142,7 @@ function route() {
   const cur = $(`.nav > a[data-l="${p}"], .navitem > a[data-l="${p}"]`) || (p.startsWith("/books/") && p !== "/books/the-trilogy/" ? $('.navitem > a[data-l="/shop/"]') : null);
   if (cur) cur.setAttribute("aria-current", "page");
   if (AFTER[r.id]) AFTER[r.id](r);
+  watchBook3d(main);
   initReveals();
   window.scrollTo(0, 0);
   window.__rendered = r.id;
@@ -306,9 +307,9 @@ function postJSON(path, body) {
 /* ===== shared blocks ===== */
 const fromPrice = k => (k === "set" ? money(PRICE.set) : "From " + money(PRICE[3]));
 function card(k) {
-  const p = PROD[k];
+  const p = PROD[k], set = k === "set";
   return `<a class="card ${k}" data-l="${prodPath(k)}" href="${href(prodPath(k))}">
-    <div class="ph">${img(p.cover, k === "set" ? "The three volumes of Letters to God side by side" : p.title + ", Volume " + p.roman, ' loading="lazy"')}${k === "set" ? '<span class="badge">Save $15</span>' : ""}</div>
+    <div class="ph">${set ? img(p.cover, "The three volumes of Letters to God side by side", ' loading="lazy"') + '<span class="badge">Save $15</span>' : book3dHtml(k, PAGES[12])}</div>
     <div><p class="num">${k === "set" ? "Volumes I, II, III" : "Volume " + p.roman}</p><h3>${p.title}</h3></div>
     <p class="sub">${k === "set" ? "One of each, twelve moons apiece, as three separate books." : p.blurb}</p>
     <p class="from">${fromPrice(k)}</p></a>`;
@@ -590,6 +591,33 @@ AFTER.contact = () => {
 };
 AFTER["thank-you"] = () => { if (/^LTG-[A-Z0-9]{8}$/.test((curQuery().get("order") || "").toUpperCase())) clearCart(); };
 
+/* ===== 3D book render: a live CSS render of the real cover art on an A5 box, =====
+   not a flat mockup. Spine width is only an approximation of Lulu's actual
+   casewrap spec, scaled to look right, not measured against it. */
+const A5_RATIO = 827 / 583; // from belongs_god.jpg, rendered at true A5 size, 100dpi
+function spineInches(pages) { return 0.12 + pages * 0.00195; }
+const gzoomHtml = () => `<span class="gzoom" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path><path d="M11 8v6M8 11h6"></path></svg></span>`;
+function book3dHtml(k, pages) {
+  const p = PROD[k];
+  return `<div class="bk3d" data-vol="${k}" data-pages="${pages}"><div class="bk3d-in">
+    <div class="bk3d-face bk3d-top"></div>
+    <div class="bk3d-face bk3d-spine" style="background:var(--v-${k})"><i class="bk3d-dot"></i><span class="bk3d-spine-txt">${esc(p.title)}</span><b class="bk3d-spine-imp">NO PARADE</b></div>
+    <div class="bk3d-face bk3d-front">${img(p.cover, p.title + ", Volume " + p.roman + ", front cover")}</div>
+  </div></div>`;
+}
+function sizeBook3d(el) {
+  const bw = el.clientWidth; if (!bw) return;
+  const bh = bw * A5_RATIO;
+  const pages = +el.dataset.pages || 172;
+  const bd = Math.max(6, bw * (spineInches(pages) / 5.83));
+  el.style.setProperty("--bw", bw + "px"); el.style.setProperty("--bh", bh + "px"); el.style.setProperty("--bd", bd + "px");
+}
+let bk3dObserver = null;
+function watchBook3d(root) {
+  if (!bk3dObserver) bk3dObserver = new ResizeObserver(entries => entries.forEach(en => sizeBook3d(en.target)));
+  $$(".bk3d", root || document).forEach(el => bk3dObserver.observe(el));
+}
+
 /* ===== product page ===== */
 const MODES = { deep: ["One deep prompt a week", "a page to write in"], daily: ["Seven short lines a week", "one for each day, dated"] };
 function galleryFor(k) {
@@ -598,6 +626,12 @@ function galleryFor(k) {
     ["spread_deep_god", "A station spread from Volume I", 0], ["spread_full_god", "The Full Moon spread from Volume I", 0], ["spread_review_god", "The review spread from Volume I: what changed at each midpoint", 0]];
   return [[p.cover, alt + ", Volume " + p.roman + ", front cover", 1], [p.wrap, alt + ", full cover with spine and back", 0], [p.belongs, "The belongs-to page, with a name printed on it", 1],
     ["spread_deep_" + k, "A station spread with one deep prompt", 0], ["spread_daily_" + k, "A station spread with seven daily lines", 0], ["spread_full_" + k, "The Full Moon reflection spread", 0], ["spread_review_" + k, "The review spread: four dated midpoints that ask what changed", 0]];
+}
+const volKeyFromCoverImg = imgKey => (/^cover_(god|future|body)$/.exec(imgKey) || [])[1] || null;
+function gMainInner(imgKey, alt, shadow, pages) {
+  const vk = volKeyFromCoverImg(imgKey);
+  if (vk) return book3dHtml(vk, pages || PAGES[12]) + gzoomHtml();
+  return `${img(imgKey, alt, ` id="gImg" class="${shadow ? "shadowed" : ""}"`)}${gzoomHtml()}`;
 }
 function pdpPage(k) {
   const p = PROD[k], set = k === "set", G = galleryFor(k), others = ORDER.filter(x => x !== k);
@@ -611,7 +645,7 @@ function pdpPage(k) {
     ["Type", "Cormorant Garamond and IBM Plex Mono"], ["Scripture", "King James Version"], ["Language", "English"], ["Printing", "On demand, per order, by a print partner"]];
   return `${crumbs([["Home", "/"], ["Shop", "/shop/"], [p.title]])}
 <div class="wrap"><div class="pdp">
-  <div class="gallery"><div class="gmain" id="gMain" data-i="0"${first[0] === "trio_covers" ? ' data-bg="light"' : ""}>${img(first[0], first[1], ` id="gImg" class="${first[2] ? "shadowed" : ""}"`)}<span class="gzoom" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path><path d="M11 8v6M8 11h6"></path></svg></span></div>
+  <div class="gallery"><div class="gmain" id="gMain" data-i="0"${first[0] === "trio_covers" ? ' data-bg="light"' : ""}>${gMainInner(first[0], first[1], first[2], PAGES[12])}</div>
     <div class="gthumbs">${G.map((g, i) => `<button type="button" data-img="${g[0]}" data-alt="${esc(g[1])}" data-sh="${g[2]}" aria-label="${esc(g[1])}"${i === 0 ? ' aria-current="true"' : ""}>${img(g[0], "", ' loading="lazy"')}</button>`).join("")}</div></div>
   <div class="buy ${k}">
     <p class="num">${set ? "Volumes I, II and III" : "Volume " + p.roman + " · " + p.tag}</p>
@@ -668,13 +702,20 @@ function bindPdp(k) {
   bindMakingRail();
   tzSel.value = guessZone(); $("#f-start").min = plusDays(0); $("#f-start").max = plusDays(365); $("#f-start").value = plusDays(14);
   $$(".gthumbs button").forEach((b, i) => b.addEventListener("click", () => {
-    const im = $("#gImg"); im.src = IMG[b.dataset.img]; im.alt = b.dataset.alt; im.className = b.dataset.sh === "1" ? "shadowed" : ""; const gm = $("#gMain"); gm.dataset.i = i; if (b.dataset.img === "trio_covers") gm.dataset.bg = "light"; else delete gm.dataset.bg;
+    const gm = $("#gMain"); gm.dataset.i = i;
+    const pages = set ? PAGES[12] : PAGES[+$("input[name=months]:checked").value];
+    gm.innerHTML = gMainInner(b.dataset.img, b.dataset.alt, b.dataset.sh === "1", pages);
+    watchBook3d(gm);
+    if (b.dataset.img === "trio_covers") gm.dataset.bg = "light"; else delete gm.dataset.bg;
     $$(".gthumbs button").forEach(x => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true");
   }));
   function update() {
     const c = readCfg(k), unit = set ? PRICE.set : PRICE[c.months];
     $("#pAmt").textContent = money(unit);
-    if (!set) { $("#pWas").textContent = c.months === 12 ? "or " + money(PRICE[3]) + " for 3 moons" : c.months === 6 ? "or " + money(PRICE[12]) + " for all 12 moons" : "or " + money(PRICE[12]) + " for all 12 moons"; $("#specPages").textContent = PAGES[c.months]; }
+    if (!set) {
+      $("#pWas").textContent = c.months === 12 ? "or " + money(PRICE[3]) + " for 3 moons" : c.months === 6 ? "or " + money(PRICE[12]) + " for all 12 moons" : "or " + money(PRICE[12]) + " for all 12 moons"; $("#specPages").textContent = PAGES[c.months];
+      const bk = $("#gMain .bk3d"); if (bk && bk.dataset.vol === k) { bk.dataset.pages = PAGES[c.months]; sizeBook3d(bk); }
+    }
     $("#buyBtn").textContent = "Add to cart · " + money(unit * c.qty);
     if (c.start_date) {
       const s = stationRows(c.start_date, c.months, c.tz);
