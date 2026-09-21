@@ -359,6 +359,39 @@ function experienceSection(k) {
   return `<div class="xp">${seq.map((o, i) => xpanel(i, o)).join("")}</div>`;
 }
 
+/* ===== making-of: an honest craft carousel, full-bleed with scroll-snap ===== */
+function mkSlide(i, imgKey, alt, cap) {
+  return `<div class="mkslide">${img(imgKey, alt, ' loading="lazy"')}<p class="mkcap">${cap}</p></div>`;
+}
+function makingSection(k) {
+  const set = k === "set";
+  const slides = set ? [
+    ["hero_set", "The Letters to God trilogy on an oak stool", "Three volumes, one process: hardcover casewrap, bound to order, never kept in stock."],
+    ["trio_covers", "The three volumes of Letters to God side by side", "Indigo, teal and rust — one to God, one to the person you’re becoming, one to the body."],
+    ["spread_deep_god", "A station spread from Volume I", "The same forty-eight commands of Jesus, in the King James words, printed three times in three voices."],
+    ["spread_review_god", "The review spread from Volume I", "Every date in every volume calculated from the real phases of the moon, for your time zone."],
+    ["belongs_god", "The belongs-to page, with a name printed on it", "Each of the three carries its own name, set before anything else is printed."]
+  ] : [
+    ["cover_" + k, PROD[k].title + ", front cover", "A5 hardcover, casewrap, matte — bound to order, never kept in stock."],
+    ["belongs_" + k, "The belongs-to page, with a name printed on it", "Your name is set on the belongs-to page before a single copy is printed."],
+    ["spread_deep_" + k, "A station spread from " + PROD[k].title, "Forty-eight commands of Jesus, compiled from the Gospels in the King James words, one to a station."],
+    ["spread_review_" + k, "The review spread from " + PROD[k].title, "Every date is calculated from the real phases of the moon — New, First Quarter, Full, Last Quarter — for your start day and time zone."],
+    ["wrap_" + k, PROD[k].title + ", full cover with spine and back", "Uncoated white paper, chosen so the ink dries into the page instead of sitting on top of it."]
+  ];
+  return `<section class="blk mk"><div class="wrap"><div class="head reveal"><p class="eyebrow">How it’s made</p><h2>How each copy comes together.</h2><p class="lede">${set ? "One process behind all three volumes, from the blank casewrap to the moon dates on the page." : "Nothing sits on a shelf waiting for you. Here is what happens between your order and your door."}</p></div></div>
+  <div class="mkrail" id="mkRail"><div class="mktrack">${slides.map((s, i) => mkSlide(i, s[0], s[1], s[2])).join("")}</div></div>
+  <div class="wrap"><div class="mkdots" id="mkDots">${slides.map((_, i) => `<span${i === 0 ? ' class="on"' : ""}></span>`).join("")}</div></div></section>`;
+}
+function bindMakingRail() {
+  const rail = $("#mkRail"); if (!rail) return;
+  const slides = $$(".mkslide", rail), dots = $$("#mkDots span");
+  if (!slides.length) return;
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.intersectionRatio > .6) { const i = slides.indexOf(en.target); dots.forEach((d, j) => d.classList.toggle("on", j === i)); } });
+  }, { root: rail, threshold: [.6] });
+  slides.forEach(s => io.observe(s));
+}
+
 /* ===== pages ===== */
 PAGES_FN.home = () => `
 <section class="hero"><div class="wrap">
@@ -605,6 +638,7 @@ function pdpPage(k) {
     </div>
   </div>
 </div></div>
+${makingSection(k)}
 <section class="blk statement" style="--accent:var(--v-${set ? "god" : k})"><div class="wrap"><p>${p.statement}</p></div></section>
 <section class="blk"><div class="wrap">${tiles()}</div></section>
 <section class="blk experience"><div class="wrap"><div class="head reveal"><p class="eyebrow">Inside the book</p><h2>${set ? "Three ways into the same year." : "The rhythm of a year."}</h2><p class="lede">${set ? "One year, three voices — the same forty-eight commands, answered differently in each volume." : "Every station follows the same shape: a command, a page, and at the Full Moon, a chance to look back."}</p></div>${experienceSection(k)}</div></section>
@@ -626,6 +660,7 @@ function stationRows(startIso, months, tz) {
 function bindPdp(k) {
   const set = k === "set", tzSel = $("#f-tz");
   GAL = galleryFor(k);
+  bindMakingRail();
   tzSel.value = guessZone(); $("#f-start").min = plusDays(0); $("#f-start").max = plusDays(365); $("#f-start").value = plusDays(14);
   $$(".gthumbs button").forEach((b, i) => b.addEventListener("click", () => {
     const im = $("#gImg"); im.src = IMG[b.dataset.img]; im.alt = b.dataset.alt; im.className = b.dataset.sh === "1" ? "shadowed" : ""; const gm = $("#gMain"); gm.dataset.i = i; if (b.dataset.img === "trio_covers") gm.dataset.bg = "light"; else delete gm.dataset.bg;
