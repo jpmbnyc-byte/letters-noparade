@@ -321,7 +321,12 @@ function tiles() {
   return `<div class="tiles">${t.map(x => `<div class="tile">${ICON[x[0]]}<h4>${x[1]}</h4><p>${x[2]}</p></div>`).join("")}</div>`;
 }
 function commandsList() {
-  return `<ul class="cmds">${DATA.names.map((n, i) => `<li><i>${pad(n[0])}</i><span>${esc(n[1])}</span><small>Moon ${Math.floor(i / 4) + 1} · ${STATION[i % 4]} · ${esc(n[2])}</small></li>`).join("")}</ul>`;
+  const rows = [];
+  for (let m = 0; m < 12; m++) {
+    const four = DATA.names.slice(m * 4, m * 4 + 4);
+    rows.push(`<tr><td>${m + 1}</td>${four.map(n => `<td><b>${esc(n[1])}</b><small>${esc(n[2])}</small></td>`).join("")}</tr>`);
+  }
+  return `<div class="tscroll"><table class="tbl cmdtbl"><thead><tr><th>Moon</th>${STATION.map(s => `<th>${s}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 }
 const accItem = (t, body, open) => `<details${open ? " open" : ""}><summary>${t}</summary><div class="in">${body}</div></details>`;
 function faqHtml(groups) {

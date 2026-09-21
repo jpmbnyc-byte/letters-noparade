@@ -207,12 +207,12 @@ header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgrou
 .band .btn{background:var(--band-ink);border-color:var(--band-ink);color:var(--band)}
 .band img{width:100%;height:auto;border-radius:2px}
 
-/* commands grid */
-.cmds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 24px;counter-reset:c}
-.cmds li{list-style:none;display:grid;grid-template-columns:30px 1fr;gap:6px;padding:9px 0;border-top:1px solid var(--line);font-family:var(--serif);font-size:1.22rem;font-weight:600;line-height:1.15}
-.cmds li small{grid-column:2;font-family:var(--mono);font-weight:400;font-size:.66rem;color:var(--mute);letter-spacing:.03em;margin-top:-4px}
-.cmds li i{font:400 .68rem var(--mono);font-style:normal;color:var(--mute);padding-top:5px}
-ul.cmds{margin:0;padding:0}
+/* commands table: 12 moons × 4 stations, instead of 48 separate cards */
+.cmdtbl{min-width:640px}
+.cmdtbl th{white-space:nowrap}
+.cmdtbl td b{display:block;font-family:var(--serif);font-size:1.05rem;font-weight:600;line-height:1.2}
+.cmdtbl td small{display:block;font-family:var(--mono);font-size:.64rem;color:var(--mute);letter-spacing:.02em;margin-top:3px}
+.cmdtbl td:first-child{font-family:var(--mono);font-size:.8rem;color:var(--mute);vertical-align:top;padding-top:14px}
 
 /* collection header */
 .pagehead{padding-block:clamp(36px,6vw,72px) clamp(20px,3vw,36px);display:grid;gap:14px}
@@ -375,7 +375,6 @@ dialog h3{margin-bottom:8px}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tile:nth-child(3){border-left:0;padding-left:0}
   .tile:nth-child(n+3){border-top:1px solid var(--line)}
-  .cmds{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fgrid .nl{grid-column:1 / -1}
 }
@@ -398,7 +397,6 @@ dialog h3{margin-bottom:8px}
   .tiles{grid-template-columns:minmax(0,1fr)}
   .tile{border-left:0;padding-left:0;border-top:1px solid var(--line)}
   .tile:first-child{border-top:0}
-  .cmds{grid-template-columns:minmax(0,1fr)}
   .fgrid{grid-template-columns:minmax(0,1fr)}
   .nl form{grid-template-columns:minmax(0,1fr)}
   .hubbar .mark{display:none}
