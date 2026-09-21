@@ -118,9 +118,6 @@ header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgrou
 .card.set .ph{background:#EEF0F2}
 .card.set .ph img{width:100%;box-shadow:none}
 .card:hover .ph img{transform:translateY(-4px)}
-.card .ph .bk3d{width:58%}
-.card .ph .bk3d-in{transition:transform .3s ease}
-.card:hover .ph .bk3d-in{transform:rotateX(6deg) rotateY(-33deg) translateY(-4px)}
 .card .num{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--c)}
 .card h3{font-size:1.45rem;line-height:1.1}
 .card .sub{color:var(--mute);font-size:.9rem}
@@ -225,29 +222,14 @@ header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgrou
 /* PDP */
 .pdp{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(24px,4.5vw,64px);align-items:start;padding-block:clamp(16px,3vw,32px) clamp(40px,6vw,72px)}
 .gallery{position:sticky;top:calc(84px + env(safe-area-inset-top,0px));display:grid;gap:12px}
-.gmain{aspect-ratio:1/1;background:var(--soft);overflow:hidden;position:relative;cursor:zoom-in;display:grid;place-items:center}
+.gmain{aspect-ratio:1/1;background:var(--soft);overflow:hidden;position:relative;cursor:zoom-in}
 .gmain[data-bg=light]{background:#EEF0F2}
 .gmain img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:clamp(12px,3vw,32px);transition:transform .5s ease}
 .gmain img.shadowed{padding:clamp(24px,6vw,64px)}
 .gmain img.shadowed{filter:drop-shadow(0 18px 22px rgba(10,20,30,.28))}
 .gmain:hover img{transform:scale(1.035)}
-.gmain .bk3d{width:min(64%,260px)}
-.gmain:hover .bk3d-in{transform:rotateX(6deg) rotateY(-33deg)}
-.gzoom{position:absolute;right:14px;bottom:14px;width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--card) 88%,transparent);display:grid;place-items:center;box-shadow:0 8px 20px -8px rgba(10,20,30,.4);pointer-events:none;z-index:2}
+.gzoom{position:absolute;right:14px;bottom:14px;width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--card) 88%,transparent);display:grid;place-items:center;box-shadow:0 8px 20px -8px rgba(10,20,30,.4);pointer-events:none}
 .gzoom svg{width:17px;height:17px;stroke:var(--ink)}
-
-/* 3D book render: real cover art on a live CSS box, not a flat mockup */
-.bk3d{width:100%;position:relative}
-.bk3d-in{position:relative;width:100%;aspect-ratio:583/827;transform-style:preserve-3d;transform:rotateX(6deg) rotateY(-28deg);transition:transform .5s ease;margin-inline:auto}
-.bk3d-face{position:absolute;backface-visibility:hidden}
-.bk3d-front{inset:0;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)}
-.bk3d-front img{width:100%;height:100%;object-fit:cover;display:block}
-.bk3d-spine{left:0;top:0;width:var(--bd,14px);height:100%;transform-origin:0% 50%;transform:rotateY(-90deg);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6% 0;box-shadow:inset 0 0 16px rgba(0,0,0,.3),inset 0 0 0 1px rgba(0,0,0,.15);container-type:inline-size}
-.bk3d-top{left:0;top:0;width:100%;height:var(--bd,14px);transform-origin:50% 0%;transform:rotateX(90deg);background:linear-gradient(to bottom,#E7E2D5,#FBF9F3 55%,#DED8C9)}
-.bk3d-dot{width:9px;height:9px;border-radius:50%;border:1px solid color-mix(in srgb,var(--moon-lit) 75%,transparent);flex:none}
-.bk3d-spine-txt{writing-mode:vertical-rl;font-family:var(--serif);font-weight:600;font-size:clamp(.55rem,46cqw,.82rem);letter-spacing:.06em;color:var(--moon-lit);line-height:1}
-.bk3d-spine-imp{writing-mode:vertical-rl;font-family:var(--mono);font-weight:500;font-size:clamp(.4rem,26cqw,.55rem);letter-spacing:.1em;color:color-mix(in srgb,var(--moon-lit) 70%,transparent);flex:none}
-.bk3d::before{content:"";position:absolute;left:6%;right:6%;bottom:-6%;height:16%;background:radial-gradient(ellipse at center,rgba(10,20,30,.3),transparent 72%);filter:blur(4px)}
 .gthumbs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .gthumbs button{aspect-ratio:1/1;background:var(--soft);border:1px solid transparent;padding:0;cursor:pointer;overflow:hidden;border-radius:2px}
 .gthumbs button img{width:100%;height:100%;object-fit:contain;padding:5px}
