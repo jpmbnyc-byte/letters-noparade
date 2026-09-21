@@ -142,6 +142,7 @@ function route() {
   const cur = $(`.nav > a[data-l="${p}"], .navitem > a[data-l="${p}"]`) || (p.startsWith("/books/") && p !== "/books/the-trilogy/" ? $('.navitem > a[data-l="/shop/"]') : null);
   if (cur) cur.setAttribute("aria-current", "page");
   if (AFTER[r.id]) AFTER[r.id](r);
+  initReveals();
   window.scrollTo(0, 0);
   window.__rendered = r.id;
 }
@@ -183,7 +184,15 @@ function chrome() {
   <div class="dhead"><h2 id="drawerTitle">Your cart</h2><button class="x" id="drawerX" aria-label="Close cart">&times;</button></div>
   <div class="dbody" id="cartBody"></div><div class="dfoot" id="cartFoot" hidden></div>
 </aside>
-<dialog id="dlg"><h3 id="dlgTitle"></h3><p id="dlgBody" class="msg"></p><pre id="dlgPre"></pre><form method="dialog"><button class="btn ghost" value="close">Close</button></form></dialog>`;
+<dialog id="dlg"><h3 id="dlgTitle"></h3><p id="dlgBody" class="msg"></p><pre id="dlgPre"></pre><form method="dialog"><button class="btn ghost" value="close">Close</button></form></dialog>
+<div class="lightbox" id="lightbox" hidden aria-modal="true" role="dialog" aria-label="Image viewer">
+  <div class="lbbar" id="lbBar"></div>
+  <button type="button" class="lbx" id="lbClose" aria-label="Close">&times;</button>
+  <div class="lbstage" id="lbStage"><img id="lbImg" alt=""></div>
+  <button type="button" class="lbnav prev" id="lbPrev" aria-label="Previous image">&lsaquo;</button>
+  <button type="button" class="lbnav next" id="lbNext" aria-label="Next image">&rsaquo;</button>
+  <p class="lbcount" id="lbCount"></p>
+</div>`;
 }
 function openNav() { $("#nav").classList.add("on"); $("#burger").setAttribute("aria-expanded", "true"); document.body.classList.add("locked"); }
 function closeNav() { const n = $("#nav"); if (!n) return; n.classList.remove("on"); $("#burger").setAttribute("aria-expanded", "false"); if (!$("#drawer").classList.contains("on")) document.body.classList.remove("locked"); }
@@ -191,6 +200,103 @@ let lastFocus = null;
 function openDrawer() { lastFocus = document.activeElement; const d = $("#drawer"); d.removeAttribute("inert"); d.classList.add("on"); $("#scrim").classList.add("on"); document.body.classList.add("locked"); setTimeout(() => $("#drawerX").focus(), 30); }
 function closeDrawer() { const d = $("#drawer"); if (!d || !d.classList.contains("on")) return; d.classList.remove("on"); d.setAttribute("inert", ""); $("#scrim").classList.remove("on"); document.body.classList.remove("locked"); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
 function toast(t) { const e = document.createElement("div"); e.className = "toast"; e.setAttribute("role", "status"); e.textContent = t; document.body.appendChild(e); setTimeout(() => e.remove(), 2600); }
+
+/* ===== lightbox: swipe between images, pinch or double-tap to zoom ===== */
+let GAL = [];
+let LB = { list: [], i: 0 };
+let lastFocusLB = null;
+let lbScale = 1, lbTx = 0, lbTy = 0, lbMode = "", lbMoved = false, lbLastTap = 0;
+let lbStartX = 0, lbStartY = 0, lbStartDist = 0, lbStartScale = 1, lbStartTx = 0, lbStartTy = 0;
+const lbPts = new Map();
+function lbApplyTransform() { const im = $("#lbImg"); if (im) im.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbScale})`; }
+function lbClampPan() {
+  const st = $("#lbStage"), im = $("#lbImg"); if (!st || !im) return;
+  const sw = st.clientWidth, sh = st.clientHeight, iw = im.clientWidth * lbScale, ih = im.clientHeight * lbScale;
+  const mx = Math.max(0, (iw - sw) / 2), my = Math.max(0, (ih - sh) / 2);
+  lbTx = Math.min(mx, Math.max(-mx, lbTx)); lbTy = Math.min(my, Math.max(-my, lbTy));
+}
+function lbRender() {
+  const im = $("#lbImg"), item = LB.list[LB.i]; if (!im || !item) return;
+  im.src = IMG[item[0]]; im.alt = item[1] || "";
+  lbScale = 1; lbTx = 0; lbTy = 0; lbApplyTransform();
+  $("#lbStage").classList.remove("zoomed");
+  $$("#lbBar span").forEach((s, i) => s.classList.toggle("on", i === LB.i));
+  $("#lbCount").textContent = `${LB.i + 1} / ${LB.list.length}`;
+  const multi = LB.list.length > 1;
+  $("#lbPrev").hidden = !multi; $("#lbNext").hidden = !multi; $("#lbBar").hidden = !multi;
+}
+function lbGo(d) { LB.i = (LB.i + d + LB.list.length) % LB.list.length; lbRender(); }
+function openLightbox(list, i) {
+  if (!list || !list.length) return;
+  LB = { list, i: i || 0 };
+  const lb = $("#lightbox");
+  $("#lbBar", lb).innerHTML = list.map(() => "<span></span>").join("");
+  lbRender();
+  lb.hidden = false; requestAnimationFrame(() => lb.classList.add("on"));
+  document.body.classList.add("locked");
+  lastFocusLB = document.activeElement; setTimeout(() => $("#lbClose").focus(), 30);
+}
+function closeLightbox() {
+  const lb = $("#lightbox"); if (!lb || lb.hidden) return;
+  lb.classList.remove("on"); document.body.classList.remove("locked");
+  setTimeout(() => { lb.hidden = true; }, 220);
+  if (lastFocusLB && lastFocusLB.focus) lastFocusLB.focus();
+}
+const lbDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function bindLightbox() {
+  const stage = $("#lbStage");
+  $("#lbClose").addEventListener("click", closeLightbox);
+  $("#lbPrev").addEventListener("click", () => lbGo(-1));
+  $("#lbNext").addEventListener("click", () => lbGo(1));
+  $("#lightbox").addEventListener("click", e => { if (e.target.id === "lightbox") closeLightbox(); });
+  stage.addEventListener("pointerdown", e => {
+    stage.setPointerCapture(e.pointerId);
+    lbPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    lbMoved = false;
+    if (lbPts.size === 1) { lbMode = "pan"; lbStartX = e.clientX; lbStartY = e.clientY; lbStartTx = lbTx; lbStartTy = lbTy; }
+    else if (lbPts.size === 2) { const [a, b] = [...lbPts.values()]; lbMode = "pinch"; lbStartDist = lbDist(a, b); lbStartScale = lbScale; }
+  });
+  stage.addEventListener("pointermove", e => {
+    if (!lbPts.has(e.pointerId)) return;
+    lbPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (lbMode === "pinch" && lbPts.size === 2) {
+      const [a, b] = [...lbPts.values()]; const d = lbDist(a, b);
+      lbScale = Math.min(4, Math.max(1, lbStartScale * (d / lbStartDist)));
+      lbClampPan(); lbApplyTransform(); stage.classList.toggle("zoomed", lbScale > 1.02);
+    } else if (lbMode === "pan") {
+      const dx = e.clientX - lbStartX, dy = e.clientY - lbStartY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) lbMoved = true;
+      if (lbScale > 1) { lbTx = lbStartTx + dx; lbTy = lbStartTy + dy; lbClampPan(); lbApplyTransform(); }
+      else { lbTx = dx * .5; lbApplyTransform(); }
+    }
+  });
+  function lbEnd(e) {
+    lbPts.delete(e.pointerId);
+    if (lbPts.size === 0) {
+      if (lbMode === "pan" && lbScale <= 1) {
+        if (lbTx > 70) lbGo(-1); else if (lbTx < -70) lbGo(1); else { lbTx = 0; lbApplyTransform(); }
+      }
+      if (!lbMoved && lbMode === "pan") {
+        const now = Date.now();
+        if (now - lbLastTap < 320) { lbScale = lbScale > 1 ? 1 : 2.4; lbClampPan(); lbApplyTransform(); stage.classList.toggle("zoomed", lbScale > 1.02); }
+        lbLastTap = now;
+      }
+      lbMode = "";
+    } else if (lbPts.size === 1) {
+      const [[, p]] = lbPts; lbMode = "pan"; lbStartX = p.x; lbStartY = p.y; lbStartTx = lbTx; lbStartTy = lbTy;
+    }
+  }
+  stage.addEventListener("pointerup", lbEnd);
+  stage.addEventListener("pointercancel", lbEnd);
+  stage.addEventListener("wheel", e => { e.preventDefault(); lbScale = Math.min(4, Math.max(1, lbScale - e.deltaY * .0025)); lbClampPan(); lbApplyTransform(); stage.classList.toggle("zoomed", lbScale > 1.02); }, { passive: false });
+}
+function initReveals() {
+  const els = $$(".reveal:not(.in)", $("#main"));
+  if (!els.length) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { els.forEach(e => e.classList.add("in")); return; }
+  const io = new IntersectionObserver(entries => entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } }), { threshold: .14, rootMargin: "0px 0px -8% 0px" });
+  els.forEach(e => io.observe(e));
+}
 function postJSON(path, body) {
   if (!CONFIG.endpoint) return Promise.reject(new Error("preview"));
   return fetch(CONFIG.endpoint.replace(/\/$/, "") + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -223,6 +329,35 @@ function faqHtml(groups) {
 }
 const crumbs = items => `<nav class="crumbs wrap" aria-label="Breadcrumb">${items.map(i => i[1] ? L(i[1], i[0]) : `<span>${i[0]}</span>`).join(" / ")}</nav>`;
 const draftNote = () => CONFIG.legalDraft ? `<p class="draft"><b>Draft.</b> This page is a working draft written for the store. Have it reviewed against your own practices and local law before you take payment, then set <code>legalDraft</code> to <code>false</code> to remove this note.</p>` : "";
+
+/* ===== experience: a contemplative walk through the pages themselves ===== */
+const XP = {
+  deep: { eyebrow: "Station one of forty-eight", h2: "One command a week, plainly put.", body: "Each station opens with a single command of Jesus, printed in the King James words, beside one prompt. No commentary, nothing to interpret — just the word, and room enough to answer it in your own hand.", cap: "STATION 1 · ONE DEEP PROMPT · A REAL SPREAD" },
+  daily: { eyebrow: "For a daily habit", h2: "Or seven lines, one for each day.", body: "Some weeks want a single sitting. Others want a smaller door you can walk through daily. Seven short lines, dated in the margin, carry the same command through the week instead of asking for it all at once.", cap: "STATION 1 · SEVEN DAILY LINES · A REAL SPREAD" },
+  full: { eyebrow: "Every twelfth page", h2: "A page to look back on.", body: "At the Full Moon the page turns inward: an opening Psalm, a closing letter, and room to reflect on the moon just past — what four weeks of one command actually did.", cap: "THE FULL MOON REFLECTION · A REAL SPREAD" },
+  review: { eyebrow: "Between the stations", h2: "Four midpoints ask what changed.", body: "Halfway between each pair of stations, a dated panel returns to the same question: what has changed since. Not a new command — a record, so a year of writing reads back as change, not only a list of answers.", cap: "THE REVIEW SPREAD · FOUR MIDPOINTS · A REAL SPREAD" }
+};
+function xpanel(i, o) {
+  return `<div class="xpanel reveal${i % 2 ? " flip" : ""}"><div class="xtext"><p class="eyebrow">${o.eyebrow}</p><h3>${o.h2}</h3><p class="body">${o.body}</p>${o.extra || ""}</div>
+    <div class="xmedia"><button type="button" class="xzoom" data-img="${o.imgKey}" data-alt="${esc(o.alt)}" aria-label="View this page larger">${img(o.imgKey, o.alt, ' loading="lazy"')}</button><p class="figcap">${o.cap}</p></div></div>`;
+}
+function experienceSection(k) {
+  const p = PROD[k];
+  if (k === "set") {
+    return `<div class="xp">${["god", "future", "body"].map((x, i) => {
+      const v = PROD[x], parts = v.lens.split(". "), head = parts[0] + ".", rest = parts.slice(1).join(". ");
+      return xpanel(i, { eyebrow: `Volume ${v.roman} · ${v.title}`, h2: head, body: rest, imgKey: "spread_deep_" + x, alt: "A station spread from " + v.title, cap: `STATION 1 · REPENT · MATTHEW 4:17 · VOLUME ${v.roman}`,
+        extra: `<p class="sample" style="margin-top:14px"><b>Station 1 · Repent · Matthew 4:17</b>${esc(DATA.vol[x].deep)}</p>` });
+    }).join("")}</div>`;
+  }
+  const seq = [
+    { ...XP.deep, imgKey: "spread_deep_" + k, alt: "A station spread from " + p.title, extra: `<p class="sample" style="margin-top:14px"><b>Station 1 · Repent · Matthew 4:17</b>${esc(DATA.vol[k].deep)}</p>` },
+    { ...XP.daily, imgKey: "spread_daily_" + k, alt: "A daily-lines spread from " + p.title, extra: `<ol class="sample" style="margin:14px 0 0;padding-left:14px;list-style-position:inside">${DATA.vol[k].daily.map(d => `<li>${esc(d)}</li>`).join("")}</ol>` },
+    { ...XP.full, imgKey: "spread_full_" + k, alt: "The Full Moon reflection spread from " + p.title },
+    { ...XP.review, imgKey: "spread_review_" + k, alt: "The review spread from " + p.title }
+  ];
+  return `<div class="xp">${seq.map((o, i) => xpanel(i, o)).join("")}</div>`;
+}
 
 /* ===== pages ===== */
 PAGES_FN.home = () => `
@@ -432,17 +567,13 @@ function pdpPage(k) {
   const specs = [["Cover", "Hardcover casewrap, matte"], ["Size", "A5, 5.83 by 8.27 in"], ["Pages", `<span id="specPages">${set ? PAGES[12] + " each" : PAGES[12]}</span>`], ["Paper", "Uncoated white"]];
   const opts = set ? `<fieldset><legend>Length</legend><p class="msg">Twelve moons in each of the three books: ${PAGES[12]} pages, all 48 commands.</p></fieldset>` :
     `<fieldset><legend>Length</legend><div class="choices c3">${[3, 6, 12].map(m => `<div class="choice"><input type="radio" name="months" id="m${m}" value="${m}"${m === 12 ? " checked" : ""}><label for="m${m}"><span class="t">${m} moons</span><span class="s">${PAGES[m]} pages · ${money(PRICE[m])}</span></label></div>`).join("")}</div></fieldset>`;
-  const sampleBlock = set ? `<div class="grid g3">${["god", "future", "body"].map(x => `<div class="vlens" style="--accent:var(--v-${x})"><p class="eyebrow">Volume ${PROD[x].roman} · ${PROD[x].title}</p><p class="sample"><b>Station 1 · Repent · Matthew 4:17</b>${esc(DATA.vol[x].deep)}</p></div>`).join("")}</div>` :
-    `<div class="duo"><div class="spreadbox">${img("spread_deep_" + k, "A station spread from " + p.title, ' class="spread" width="1166" height="827" loading="lazy"')}<p class="figcap">MOON I · STATION 1 · COMMAND 01 OF 48 · A REAL SPREAD FROM VOLUME ${p.roman}</p></div>
-      <div class="vlens" style="--accent:var(--v-${k})"><p class="eyebrow">The first prompt</p><p class="sample"><b>Station 1 · Repent · Matthew 4:17</b>${esc(DATA.vol[k].deep)}</p>
-      <p class="eyebrow" style="margin-top:14px">Or, in seven-lines mode</p><ol class="sample" style="margin:0;padding-left:14px;list-style-position:inside">${DATA.vol[k].daily.map(d => `<li>${esc(d)}</li>`).join("")}</ol></div></div>`;
   const features = [`${set ? "Three books, " : ""}56, 100 or 172 pages by edition, hardcover casewrap, A5`, "48 commands of Jesus in the King James words, one each week", "Four stations a moon: New Moon, First Quarter, Full Moon, Last Quarter", "Four midpoints a moon (the crescent and gibbous phases): a dated page that asks what changed",
     "A command and a prompt on the left, a ruled page on the right", "A Full Moon reflection, an opening Psalm and a closing letter each moon", "Your name on the belongs-to page", "Every date calculated for your start day and time zone"];
   const details = [["Size", "A5, 5.83 by 8.27 in (14.8 by 21 cm)"], ["Binding", "Hardcover casewrap, matte cover"], ["Pages", "56, 100 or 172, by edition"], ["Paper", "Uncoated white, so ink can dry into the page"],
     ["Type", "Cormorant Garamond and IBM Plex Mono"], ["Scripture", "King James Version"], ["Language", "English"], ["Printing", "On demand, per order, by a print partner"]];
   return `${crumbs([["Home", "/"], ["Shop", "/shop/"], [p.title]])}
 <div class="wrap"><div class="pdp">
-  <div class="gallery"><div class="gmain" id="gMain"${first[0] === "trio_covers" ? ' data-bg="light"' : ""}>${img(first[0], first[1], ` id="gImg" class="${first[2] ? "shadowed" : ""}"`)}</div>
+  <div class="gallery"><div class="gmain" id="gMain" data-i="0"${first[0] === "trio_covers" ? ' data-bg="light"' : ""}>${img(first[0], first[1], ` id="gImg" class="${first[2] ? "shadowed" : ""}"`)}<span class="gzoom" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path><path d="M11 8v6M8 11h6"></path></svg></span></div>
     <div class="gthumbs">${G.map((g, i) => `<button type="button" data-img="${g[0]}" data-alt="${esc(g[1])}" data-sh="${g[2]}" aria-label="${esc(g[1])}"${i === 0 ? ' aria-current="true"' : ""}>${img(g[0], "", ' loading="lazy"')}</button>`).join("")}</div></div>
   <div class="buy ${k}">
     <p class="num">${set ? "Volumes I, II and III" : "Volume " + p.roman + " · " + p.tag}</p>
@@ -476,7 +607,7 @@ function pdpPage(k) {
 </div></div>
 <section class="blk statement" style="--accent:var(--v-${set ? "god" : k})"><div class="wrap"><p>${p.statement}</p></div></section>
 <section class="blk"><div class="wrap">${tiles()}</div></section>
-<section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">From the book</p><h2>${set ? "Three ways into the same command." : "Here is how it reads."}</h2></div>${sampleBlock}</div></section>
+<section class="blk experience"><div class="wrap"><div class="head reveal"><p class="eyebrow">Inside the book</p><h2>${set ? "Three ways into the same year." : "The rhythm of a year."}</h2><p class="lede">${set ? "One year, three voices — the same forty-eight commands, answered differently in each volume." : "Every station follows the same shape: a command, a page, and at the Full Moon, a chance to look back."}</p></div>${experienceSection(k)}</div></section>
 <section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">The full list</p><h2>Every command, in order.</h2><p class="lede">${set ? "One command a week, 48 in all, listed below in order. Every volume in this set carries the complete 48." : "One command a week, 48 in all, listed below in order. A 3-moon book carries the first 12 weeks, a 6-moon book the first 24, and the 12-moon book the complete set."}</p></div>
   <div class="acc">${accItem("See all 48 commands", commandsList())}</div></div></section>
 <section class="blk"><div class="wrap"><div class="head"><p class="eyebrow">Others also bought</p><h2>The rest of the shelf.</h2></div><div class="grid g3">${others.map(card).join("")}</div></div></section>`;
@@ -494,9 +625,10 @@ function stationRows(startIso, months, tz) {
 }
 function bindPdp(k) {
   const set = k === "set", tzSel = $("#f-tz");
+  GAL = galleryFor(k);
   tzSel.value = guessZone(); $("#f-start").min = plusDays(0); $("#f-start").max = plusDays(365); $("#f-start").value = plusDays(14);
-  $$(".gthumbs button").forEach(b => b.addEventListener("click", () => {
-    const i = $("#gImg"); i.src = IMG[b.dataset.img]; i.alt = b.dataset.alt; i.className = b.dataset.sh === "1" ? "shadowed" : ""; const gm = $("#gMain"); if (b.dataset.img === "trio_covers") gm.dataset.bg = "light"; else delete gm.dataset.bg;
+  $$(".gthumbs button").forEach((b, i) => b.addEventListener("click", () => {
+    const im = $("#gImg"); im.src = IMG[b.dataset.img]; im.alt = b.dataset.alt; im.className = b.dataset.sh === "1" ? "shadowed" : ""; const gm = $("#gMain"); gm.dataset.i = i; if (b.dataset.img === "trio_covers") gm.dataset.bg = "light"; else delete gm.dataset.bg;
     $$(".gthumbs button").forEach(x => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true");
   }));
   function update() {
@@ -603,7 +735,7 @@ async function checkout() {
 function boot() {
   const app = $("#app");
   app.innerHTML = chrome();
-  loadCart(); renderCart();
+  loadCart(); renderCart(); bindLightbox();
   document.addEventListener("click", e => {
     const a = e.target.closest("a[data-l]");
     if (a && !(e.metaKey || e.ctrlKey || e.shiftKey || e.button)) { e.preventDefault(); go(a.getAttribute("data-l")); return; }
@@ -614,6 +746,9 @@ function boot() {
     if (e.target.closest("#burger")) { $("#nav").classList.contains("on") ? closeNav() : openNav(); return; }
     if (e.target.closest("#chev")) { const it = e.target.closest(".navitem"); const o = it.classList.toggle("open"); $("#chev").setAttribute("aria-expanded", o); return; }
     if (e.target.closest("#checkoutBtn")) { checkout(); return; }
+    if (e.target.closest("#gMain")) { const gm = e.target.closest("#gMain"); openLightbox(GAL, +gm.dataset.i || 0); return; }
+    const xz = e.target.closest(".xzoom");
+    if (xz) { openLightbox([[xz.dataset.img, xz.dataset.alt, 0]], 0); return; }
     const q = e.target.closest("[data-q]"), rm = e.target.closest("[data-rm]");
     if (q || rm) {
       const row = e.target.closest(".line"), l = cart.find(x => x.id === row.dataset.id); if (!l) return;
@@ -623,7 +758,10 @@ function boot() {
     }
     if (!e.target.closest(".navitem")) $(".navitem") && $(".navitem").classList.remove("open");
   });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeNav(); } });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { if (!$("#lightbox").hidden) { closeLightbox(); return; } closeDrawer(); closeNav(); }
+    if (!$("#lightbox").hidden) { if (e.key === "ArrowLeft") lbGo(-1); else if (e.key === "ArrowRight") lbGo(1); }
+  });
   document.addEventListener("input", e => { if (e.target.id === "cartEmail") cartEmail = e.target.value; });
   document.addEventListener("submit", async e => {
     if (e.target.id !== "nlForm") return;
