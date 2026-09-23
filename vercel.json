@@ -4,6 +4,10 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/admin", "destination": "/api/admin" },
+    { "source": "/admin/:path*", "destination": "/api/admin/:path*" }
+  ],
   "headers": [
     { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
     { "source": "/config.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
