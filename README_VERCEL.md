@@ -19,6 +19,19 @@ Static site in `public/`, and one Vercel Function (`api/[...path].js`) that does
 7. **Redeploy** (Deployments > the latest one > Redeploy) so the new variables apply.
 8. Buy a test book with card 4242 4242 4242 4242. It should appear at `/api/admin/orders` with header `Authorization: Bearer <ADMIN_TOKEN>`.
 
+## Orders page
+
+Open `https://letters.noparade.store/admin` on your phone or computer and sign in.
+
+- **Password:** add `ADMIN_PASSWORD` in Vercel → Settings → Environment Variables (something you can type), then redeploy.
+  Without it, the password is your `ADMIN_TOKEN`. `ADMIN_TOKEN` must be set either way; it signs the login cookie.
+- **Tabs:** To do (needs attention, paid, files ready, problems) · At the printer · Shipped · Done · All · Messages.
+- **Each order** shows the books (edition, name, start date, time zone, style), the shipping address, what was paid,
+  and its history. Update the status, the printer's order number (e.g. RPI), and the carrier and tracking number. USPS/UPS/FedEx/DHL
+  links are built for you. Every change is added to the history.
+- Stages: Paid → Files ready → Sent to printer → Printing → Shipped → Delivered (plus Needs attention, Problem, Refunded).
+- The JSON routes used by `fulfil.py` are unchanged and still take `Authorization: Bearer <ADMIN_TOKEN>`.
+
 ## Fulfilment
 
 `WORKER_URL=https://letters.noparade.store/api` and `ADMIN_TOKEN=...`, then `python fulfil.py --pull` (see the fulfil folder). Nothing else changes.

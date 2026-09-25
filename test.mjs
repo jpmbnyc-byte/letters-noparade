@@ -60,4 +60,29 @@ assert.equal((await call("POST", "/api/contact", { name: "A", email: "a@b.co", t
 assert.equal(JSON.parse((await call("GET", "/api/admin/messages", null, { authorization: "Bearer adm" })).body).length, 1);
 assert.equal((await call("OPTIONS", "/api/checkout")).status, 200);
 assert.equal((await call("GET", "/api/nothing")).status, 404);
+// owner's orders page
+r = await call("GET", "/admin"); assert.equal(r.status, 303); assert.equal(r.headers.location, "/admin/login");
+assert.equal((await call("GET", "/api/admin/order/" + id)).status, 303);                       // same page via the /api path
+assert.match((await call("GET", "/admin/login")).body, /Sign in/);
+assert.equal((await call("POST", "/admin/login", "password=nope", { "content-type": "application/x-www-form-urlencoded" })).status, 401);
+r = await call("POST", "/admin/login", "password=adm", { "content-type": "application/x-www-form-urlencoded" });
+assert.equal(r.status, 303); const cookie = r.headers["set-cookie"].split(";")[0]; assert.match(r.headers["set-cookie"], /HttpOnly; Secure; SameSite=Lax/);
+assert.equal((await call("GET", "/admin", null, { cookie: "ltg_admin=9999999999.forged" })).status, 303);
+r = await call("GET", "/admin?view=all", null, { cookie }); assert.equal(r.status, 200);
+assert.match(r.body, new RegExp(id)); assert.match(r.body, /LTG-GONE/); assert.match(r.body, /Needs attention/); assert.equal(r.headers["x-robots-tag"], "noindex, nofollow");
+r = await call("GET", "/admin/order/" + id, null, { cookie }); assert.match(r.body, /Letters to God, 12 moons/); assert.match(r.body, /Bayonne, NJ, 07002/); assert.match(r.body, /for Marielle/);
+const form = "status=shipped&printer_order_id=RPI-123&carrier=USPS&tracking_number=9400+1000&tracking_url=&note=Left+the+printer";
+r = await call("POST", "/admin/order/" + id, form, { cookie, "content-type": "application/x-www-form-urlencoded", origin: "https://letters.test" });
+assert.equal(r.status, 303);
+const saved = JSON.parse(db.get("order:" + id));
+assert.equal(saved.status, "shipped"); assert.equal(saved.printer_order_id, "RPI-123"); assert.ok(saved.shipped_at);
+assert.equal(saved.tracking.url, "https://tools.usps.com/go/TrackConfirmAction?tLabels=94001000");
+assert.equal(saved.history.at(-1).note, "Left the printer");
+assert.match((await call("GET", "/admin/order/" + id, null, { cookie })).body, /Track USPS 94001000/);
+assert.equal((await call("POST", "/admin/order/" + id, "status=delivered", { cookie, "content-type": "application/x-www-form-urlencoded", origin: "https://evil.test" })).status, 403);
+r = await call("POST", "/admin/order/" + id, "status=shipped&carrier=Other&tracking_number=X1&tracking_url=javascript:alert(1)", { cookie, "content-type": "application/x-www-form-urlencoded" });
+assert.equal(JSON.parse(db.get("order:" + id)).tracking.url, "");                               // only https links are kept
+assert.match((await call("GET", "/admin?view=messages", null, { cookie })).body, /Where is my book/);
+assert.equal((await call("GET", "/api/admin/orders", null, { cookie })).status, 401);          // JSON routes still need the Bearer token
+assert.equal((await call("GET", "/admin/logout")).headers["set-cookie"].includes("Max-Age=0"), true);
 console.log("vercel adapter tests passed;", calls, "redis calls");
