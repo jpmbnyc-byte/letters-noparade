@@ -29,14 +29,26 @@ The interior's navy/teal/rust accents print as greys; the cover prints in full c
 On lulu.com (manual orders): Create → Print Book → choose the options above → upload the interior and cover PDFs.
 
 ## What each moon contains (12 pages)
-Opener with a Psalm (recto) · "What changed" review spread (four dated midpoints) · four station spreads
-(command + prompt on the left, ruled page on the right; the Full Moon station's right page is the Full Moon reflection) ·
-closing letter. Front matter is 10 pages; the rest is answered-prayers and notes pages up to the page count.
+In the order it is lived, with each midpoint right after the station before it:
+
+| Page | Contents |
+|---|---|
+| 1 (recto) | Opener: Psalm, dated map of the moon with page numbers, "This moon I bring to God" |
+| 2–3 | New Moon station; waxing-crescent midpoint at the foot of the writing page |
+| 4–5 | First Quarter station; waxing-gibbous midpoint at the foot |
+| 6–7 | Full Moon station (full writing page) |
+| 8–9 | Full Moon reflection · waning-gibbous midpoint (full page) |
+| 10–11 | Last Quarter station; waning-crescent midpoint at the foot |
+| 12 | Looking back: the four commands and what each did, then the letter |
+
+Each midpoint asks one fixed question ("What has shifted since the …?", so a year reads back as a record)
+and one tied to the command just lived (`MIDPOINT` in `prompts_<volume>.py`, falling back to the volume's
+`midpoint_q`). Front matter is 10 pages; the rest is answered-prayers and notes pages up to the page count.
 
 ## Files
 - `build.py`: the generator (evolved from the first Letters to God generator: same fonts, colours, helpers, lunar maths)
 - `commands.py`: the 48 commands, names/references as on the store, KJV text from the NewStart Discipleship list
 - `volumes.py`: titles, colours, cover copy and the fixed questions for each volume
-- `prompts_god.py`: all 48 weeks for Letters to God (21 from the first generator, 27 new; review before selling)
+- `prompts_god.py`: all 48 weeks for Letters to God (21 from the first generator, 27 new) and 48 midpoint questions; review before selling
 - `prompts_future.py`, `prompts_body.py`: only week 1 so far; the generator refuses editions that need missing weeks
 - `fonts/`: Cormorant Garamond and IBM Plex Mono (SIL Open Font License)

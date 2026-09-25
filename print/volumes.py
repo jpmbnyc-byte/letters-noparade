@@ -30,7 +30,7 @@ VOLUMES = {
   back_head="A prayer journal for the long conversation.",
   back_body="Each lunar month holds four stations, one at every turning of the moon, and four midpoints that ask what has changed. Each station opens with one command of Jesus, in the King James words, and leaves the rest of the page to you. Write to God the way you would write to someone who already knows.",
   back_close="No streaks. No scores. The page, the moon, and the One who reads what you write.",
-  midpoint_q="Where has God felt near since then, and where has He seemed far?",
+  midpoint_q="Where has God felt near since then, and where has He seemed far?",  # fallback when a command has no MIDPOINT entry
   fullmoon_qs=["What was hidden at the New Moon that I can see now?",
                "Where did I pray and feel heard? Where did I pray and feel nothing?",
                "What do I carry into the waning half?"],
@@ -65,3 +65,7 @@ VOLUMES = {
 
 def prompts(key):
     return importlib.import_module("prompts_" + key).PROMPTS
+
+def midpoints(key):
+    """Command-specific second midpoint question, by command number (falls back to the volume's midpoint_q)."""
+    return getattr(importlib.import_module("prompts_" + key), "MIDPOINT", {})

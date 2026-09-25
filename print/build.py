@@ -5,9 +5,10 @@
         --start 2026-09-20 --tz America/New_York --out out/
 
 Evolved from the first Letters to God generator (same fonts, colours, drawing helpers, lunar maths
-and cover geometry) to the 48-command edition sold on the store: four stations a moon (New Moon,
-First Quarter, Full Moon, Last Quarter), four dated midpoints on a review spread, a Full Moon
-reflection, a Psalm to open each moon and a letter to close it. 56 / 100 / 172 pages.
+and cover geometry) to the 48-command edition sold on the store. Each moon is 12 pages laid out in the order it is lived:
+opener (Psalm, dated map, intention) · station 1 + waxing-crescent midpoint · station 2 + waxing-gibbous
+midpoint · station 3 · Full Moon reflection | waning-gibbous midpoint · station 4 + waning-crescent
+midpoint · a closing look-back and letter. 56 / 100 / 172 pages.
 
 Lunar dates come from PyEphem, so a fresh --start regenerates the book for any order date.
 Lulu product: A5 hardcover casewrap, matte, standard black & white interior, 60# uncoated white
@@ -57,7 +58,7 @@ def spine_in(pages):
 
 TARGET_PAGES = {3: 56, 6: 100, 12: 172}
 FRONT = 10
-PER_MOON = 12      # opener, review spread (2), four station spreads (8), closing letter
+PER_MOON = 12      # opener, four station spreads (8), Full Moon | midpoint spread (2), close
 
 STATIONS = [("new", "New Moon", 0), ("first_q", "First Quarter", 90), ("full", "Full Moon", 180), ("last_q", "Last Quarter", 270)]
 MIDPOINTS = [("Waxing crescent", "New Moon", 45), ("Waxing gibbous", "First Quarter", 135),
@@ -243,9 +244,10 @@ def page_how(b, v, months, mode, ncmd):
      v["lens"],
      ("Beside each command is one prompt and a page for your own words." if mode == "deep" else
       "Beside each command are seven short lines, one for each day of the week, dated in the margin. Take the one that fits the day."),
-     "Between the stations the moon is a crescent or a gibbous. Near the start of each moon, a review spread gives each of these four "
-     "midpoints a dated panel that asks what has changed. The midpoints carry no new command.",
-     f"Each moon also opens with a Psalm, adds a reflection at the Full Moon, and closes with a letter {letter}.",
+     "Between the stations the moon is a crescent or a gibbous. Each of these four midpoints has a dated panel just after the "
+     "station before it, asking what has shifted and how the week's command is taking hold. The midpoints carry no new command.",
+     f"Each moon opens with a Psalm and a map of its dates, where you name what you bring to it. It adds a reflection at the Full Moon, "
+     f"and closes by looking back at its four commands and writing a letter {letter}. The pages run in the order you live them.",
      "There is no wrong pace. Skip a station. Write in the margins. The moon keeps its own schedule either way."]
     for p in paras:
         y = para(c, p, x0, y, w, "PM-Reg", 8.2, 12.8, INK) - 8
@@ -317,43 +319,45 @@ def page_opener(b, v, i, L, tz, cmds):
     y = para(c, "“" + epi + "”", ex, b.H - 3.4 * IN, ew, "CG-Ital", 12.5, 16.5, INK, "c")
     spaced(c, "— " + ref.upper() + " (KJV)", b.W / 2, y - 2, "PM-Reg", 6.8, 1.2, "c", GRAY)
     y -= 28
-    spaced(c, "FOUR STATIONS", x0, y, "PM-Reg", 6.8, 1.5, "l", ACCENT); hairline(c, x0, x1, y - 5, ACCENT, 0.75); y -= 17
-    for s, (k, label, _) in enumerate(STATIONS):
-        c.setFillColor(INK); c.setFont("PM-Reg", 7)
-        c.drawString(x0, y, str(s + 1)); c.drawString(x0 + 14, y, fmt_day(to_local(L[k], tz)))
-        c.setFillColor(GRAY); c.drawString(x0 + 70, y, label)
-        c.setFillColor(INK); c.drawString(x0 + 150, y, cmds[s]["name"]); y -= 13
-    y -= 8
-    spaced(c, "FOUR MIDPOINTS", x0, y, "PM-Reg", 6.8, 1.5, "l", ACCENT); hairline(c, x0, x1, y - 5, ACCENT, 0.75); y -= 17
-    for s, (label, _, _) in enumerate(MIDPOINTS):
-        c.setFillColor(INK); c.setFont("PM-Reg", 7); c.drawString(x0 + 14, y, fmt_day(to_local(L["mid"][s], tz)))
-        c.setFillColor(GRAY); c.drawString(x0 + 70, y, label)
-        c.setFillColor(INK); c.drawString(x0 + 150, y, "What changed"); y -= 13
+    spaced(c, "THIS MOON, IN ORDER", x0, y, "PM-Reg", 6.8, 1.5, "l", ACCENT); hairline(c, x0, x1, y - 5, ACCENT, 0.75); y -= 17
+    p0 = b.pg
+    pages = [p0 + 1, p0 + 2, p0 + 3, p0 + 4, p0 + 5, p0 + 8, p0 + 9, p0 + 10]   # station, midpoint, … in date order
+    rows = []
+    for s in range(4):
+        rows.append((to_local(L[STATIONS[s][0]], tz), STATIONS[s][1], cmds[s]["name"], True))
+        rows.append((to_local(L["mid"][s], tz), MIDPOINTS[s][0], "what has shifted", False))
+    for (t, phase, what, station), pg in zip(rows, pages):
+        c.setFillColor(INK if station else GRAY); c.setFont("PM-Reg", 7)
+        c.drawString(x0, y, fmt_day(t)); c.drawString(x0 + 56, y, phase)
+        c.setFillColor(INK if station else GRAY); c.drawString(x0 + 140, y, what)
+        c.setFillColor(GRAY); c.drawRightString(x1, y, f"p. {pg}")
+        y -= 12.5
     y -= 12
     spaced(c, v["opener_line"], x0, y, "PM-Reg", 6.8, 1.5, "l", ACCENT)
     rules(c, x0, x1, y - 4, 0.75 * IN, 19)
     b.end()
 
-def page_review(b, v, i, L, tz, part):
+def midpoint_panel(b, v, i, L, tz, k, cm, y_top, y_bot):
+    """One dated midpoint: a fixed question (so a year reads back as a record) and one tied to the command just lived."""
     c = b.c; x0, x1 = b.bounds(); w = x1 - x0
-    y = page_header(b, f"MOON {roman(i+1)} · WHAT CHANGED" + (" · CONTINUED" if part else ""), "")
-    bottom = 0.72 * IN
-    panel = (y - bottom) / 2
-    for j in range(2):
-        k = part * 2 + j
-        label, since, theta = MIDPOINTS[k]
-        top = y - j * panel - 22
-        if j: hairline(c, x0, x1, y - j * panel + 4, ACCENT, 0.75)
-        moon(c, x0 + 7, top + 4, 7, theta)
-        c.setFillColor(INK); c.setFont("CG-Bold", 16); c.drawString(x0 + 22, top, label)
-        spaced(c, fmt_day(to_local(L["mid"][k], tz)).upper(), x1, top + 2, "PM-Reg", 6.8, 1.2, "r", GRAY)
-        spaced(c, "SINCE THE " + since.upper(), x0 + 22, top - 13, "PM-Reg", 6, 1.3, "l", GRAY)
-        yy = para(c, f"What has changed since the {since}, in you or around you? Write what has shifted, even if it is small.",
-                  x0, top - 34, w, "PM-Reg", 8, 12.5, INK)
-        q2_top = top - panel * 0.55
-        rules(c, x0, x1, yy + 4, q2_top + 16, 19)
-        yy = para(c, v["midpoint_q"], x0, q2_top, w, "PM-Reg", 8, 12.5, INK)
-        rules(c, x0, x1, yy + 4, y - (j + 1) * panel + 14, 19)
+    label, since, theta = MIDPOINTS[k]
+    hairline(c, x0, x1, y_top, ACCENT, 0.75)
+    top = y_top - 22
+    moon(c, x0 + 7, top + 4, 7, theta)
+    c.setFillColor(INK); c.setFont("CG-Bold", 16); c.drawString(x0 + 22, top, label)
+    spaced(c, fmt_day(to_local(L["mid"][k], tz)).upper(), x1, top + 2, "PM-Reg", 6.8, 1.2, "r", GRAY)
+    spaced(c, f"MIDPOINT · SINCE THE {since.upper()} · {cm['name'].upper()}", x0 + 22, top - 13, "PM-Reg", 6, 1.2, "l", GRAY)
+    specific = V.midpoints(v["key"]).get(cm["n"], v["midpoint_q"])
+    room = top - 24 - y_bot
+    yy = para(c, f"What has shifted since the {since}, in you or around you?", x0, top - 34, w, "PM-Reg", 8, 12.5, INK)
+    q2 = yy - 2 - room * 0.30
+    rules(c, x0, x1, yy + 4, q2 + 14, 19)
+    yy = para(c, specific, x0, q2, w, "PM-Reg", 8, 12.5, INK)
+    rules(c, x0, x1, yy + 4, y_bot, 19)
+
+def page_midpoint_full(b, v, i, L, tz, k, cm):
+    y = page_header(b, f"MOON {roman(i+1)} · {MIDPOINTS[k][0].upper()}", fmt_day(to_local(L["mid"][k], tz)).upper(), MIDPOINTS[k][2])
+    midpoint_panel(b, v, i, L, tz, k, cm, y - 6, 0.72 * IN)
     b.end()
 
 def fit_kjv(text, width):
@@ -392,11 +396,16 @@ def page_station_left(b, v, i, s, L, tz, cm, prompt, mode, ncmd):
             hairline(c, x0, x1, yy - step + 12)
     b.end()
 
-def page_station_right(b, i, s, L, tz, cm):
+def page_station_right(b, v, i, s, L, tz, cm, mid=None):
     key, label, theta = STATIONS[s]
     c = b.c; x0, x1 = b.bounds()
     y = page_header(b, f"{cm['n']:02d} · {cm['name'].upper()}", fmt_day(to_local(L[key], tz)).upper(), theta)
-    rules(c, x0, x1, y, 0.72 * IN, 20)
+    if mid is None:
+        rules(c, x0, x1, y, 0.72 * IN, 20)
+    else:
+        split = 0.72 * IN + (y - 0.72 * IN) * 0.46       # writing above, the next midpoint below
+        rules(c, x0, x1, y, split + 10, 20)
+        midpoint_panel(b, v, i, L, tz, mid, cm, split, 0.72 * IN)
     b.end()
 
 def page_fullmoon(b, v, i, L, tz):
@@ -414,12 +423,22 @@ def page_fullmoon(b, v, i, L, tz):
         rules(c, x0, x1, yy2 - 2, yy - block + 8, 19)
     b.end()
 
-def page_letter(b, v, i, L, tz):
-    c = b.c; x0, x1 = b.bounds()
+def page_close(b, v, i, L, tz, cmds, opener_pg):
+    c = b.c; x0, x1 = b.bounds(); w = x1 - x0
     e = to_local(L["end"], tz)
-    top = page_header(b, f"MOON {roman(i+1)} · CLOSING LETTER", "NEXT NEW MOON · " + fmt_day(e).upper()) + 8
-    c.setFillColor(ACCENT); c.setFont("CG-Ital", 22); c.drawString(x0, top - 48, v["salutation"])
-    rules(c, x0, x1, top - 58, 1.0 * IN, 20)
+    top = page_header(b, f"MOON {roman(i+1)} · LOOKING BACK", "NEXT NEW MOON · " + fmt_day(e).upper()) + 8
+    spaced(c, "THIS MOON'S FOUR COMMANDS · WHAT EACH DID IN ME", x0, top - 30, "PM-Reg", 6.5, 1.3, "l", ACCENT)
+    y = top - 50
+    for s, cm in enumerate(cmds):
+        c.setFillColor(GRAY); c.setFont("PM-Reg", 6.8); c.drawString(x0, y, fmt_day(to_local(L[STATIONS[s][0]], tz)).upper())
+        c.setFillColor(INK); c.setFont("CG-Bold", 12); c.drawString(x0 + 62, y, cm["name"])
+        hairline(c, x0 + 62, x1, y - 16); y -= 30
+    y -= 4
+    para(c, f"Before you write, read what you brought {'to God' if v['key'] == 'god' else 'to this moon'} on page {opener_pg}.",
+         x0, y, w, "PM-Reg", 7.5, 11.5, GRAY)
+    y -= 34
+    c.setFillColor(ACCENT); c.setFont("CG-Ital", 22); c.drawString(x0, y, v["salutation"])
+    rules(c, x0, x1, y - 10, 1.0 * IN, 20)
     c.setFillColor(GRAY); c.setFont("CG-Ital", 13); c.drawString(x0, 0.72 * IN, "Yours,")
     b.end()
 
@@ -459,14 +478,19 @@ def build_interior(path, v, months, start, mode, tzname, name):
     for i, L in enumerate(lunas):
         assert b.pg % 2 == 1                                  # openers land on recto pages
         mc = cmds[i * 4:(i + 1) * 4]
+        opener_pg = b.pg
         page_opener(b, v, i, L, tz, mc)
-        page_review(b, v, i, L, tz, 0); page_review(b, v, i, L, tz, 1)
         for s in range(4):
             assert b.pg % 2 == 0                              # station spreads open on a verso
             page_station_left(b, v, i, s, L, tz, mc[s], P[mc[s]["n"]], mode, ncmd)
-            if s == 2: page_fullmoon(b, v, i, L, tz)
-            else: page_station_right(b, i, s, L, tz, mc[s])
-        page_letter(b, v, i, L, tz)
+            if s == 2:                                        # Full Moon: its own writing page, then reflection | midpoint
+                page_station_right(b, v, i, s, L, tz, mc[s])
+                page_fullmoon(b, v, i, L, tz)
+                page_midpoint_full(b, v, i, L, tz, 2, mc[s])
+            else:
+                page_station_right(b, v, i, s, L, tz, mc[s], mid=s)
+        page_close(b, v, i, L, tz, mc, opener_pg)
+        assert b.pg - opener_pg == PER_MOON
     target = TARGET_PAGES[months]
     back = target - (b.pg - 1)
     assert back >= 0, (target, b.pg - 1)
